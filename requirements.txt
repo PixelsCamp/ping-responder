@@ -1,0 +1,4 @@
+pip
+setuptools
+wheel
+scapy==2.4.*
