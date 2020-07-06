@@ -2,7 +2,7 @@
 
 This service allows your machine to ignore ICMP `echo-request` packets (pings) unless the remote client includes a specific keyword (and only that keyword) as the payload, at which point it will send back an ICMP `echo-reply` containing some custom data.
 
-This was written for one of the challenges in the Pixels Camp [quizshow](https://quiz.pixels.camp/) qualifiers, so it may or may not prove useful in other situations.
+This was written for one of the challenges in the Pixels Camp [quizshow](https://blog.pixels.camp/the-quizshow-wrap-up-58a4855be6c) qualifiers, so it may or may not prove useful in other situations.
 
 ## Usage
 
