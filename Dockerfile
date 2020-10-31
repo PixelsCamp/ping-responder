@@ -21,7 +21,12 @@ FROM python:3.8-alpine
 
 ENV APP_ROOT="/opt/ping-responder"
 
-RUN apk add --no-cache tcpdump
+#
+# Scapy uses "ctypes.util.find_library()" to search for "pcap". We need "libpcap.so" ("libpcap-dev") to exist because
+# it doesn't find specific ".so" versions. We also need "objdump" ("binutils") otherwise it defaults to using "ldconfig"
+# expecting it to work like in glibc-based distros (which it doesn't). This almost doubles the image's size... *sigh*
+#
+RUN apk add --no-cache binutils libpcap-dev tcpdump
 
 COPY --chown=0:0 requirements.txt "${APP_ROOT}"/requirements.txt
 RUN pip install --upgrade -r "${APP_ROOT}/requirements.txt" && rm -f "${APP_ROOT}/requirements.txt"
