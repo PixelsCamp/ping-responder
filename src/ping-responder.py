@@ -160,7 +160,7 @@ def send_icmp_echo_reply(raw_socket, request_packet, payload_bytes=None, trigger
     if payload_length < max_payload_length:  # ...add padding.
         payload_bytes += b"\0" * (max_payload_length - payload_length)
 
-    rep_ip = IP(src=req_ip.dst, dst=req_ip.src)
+    rep_ip = IP(src=req_ip.dst, dst=req_ip.src, id=random.getrandbits(16))
     rep_icmp = ICMP(type=0, id=req_icmp.id, seq=req_icmp.seq)
     raw_socket.send(rep_ip / rep_icmp / payload_bytes)
 
