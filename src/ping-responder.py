@@ -13,6 +13,7 @@ import logging
 import pwd
 import grp
 import signal
+import random
 
 from argparse import ArgumentParser
 
@@ -70,6 +71,11 @@ def parse_args():
     parser.add_argument("-t", dest="trigger", action="store", metavar="text",
                               help="Reply only to ICMP echo-requests containing this text.")
 
+    parser.add_argument("-z", dest="fuzzy", action="store_true",
+                              help="Fuzzy match the trigger text.")
+    parser.add_argument("-r", dest="randomize", action="store_true",
+                              help="Reply with a single random line from the response text.")
+
     group = parser.add_mutually_exclusive_group()
 
     group.add_argument("-s", dest="text", action="store", metavar="text",
@@ -100,7 +106,7 @@ def drop_privileges(user, group):
     os.umask(0o077)
 
 
-def send_icmp_echo_reply(raw_socket, request_packet, payload_bytes=None, trigger_bytes=None):
+def send_icmp_echo_reply(raw_socket, request_packet, payload_bytes=None, trigger_bytes=None, fuzzy_match=False):
     """
     Send an ICMP echo-reply containing the specified payload back to the sender.
     When a trigger is specified, only requests that include it will be answered.
@@ -123,14 +129,30 @@ def send_icmp_echo_reply(raw_socket, request_packet, payload_bytes=None, trigger
         else:
             log.debug("Request %d/%d payload: '%s'", req_icmp.id, req_icmp.seq, snippet)
 
-    if trigger_bytes is not None and request_load != trigger_bytes:
-        log.info("Ignoring ICMP echo-request from %s without trigger payload." % req_ip.src)
-        return
+    if trigger_bytes is not None:
+        match_request = request_load
+        match_trigger = trigger_bytes
+
+        if fuzzy_match:  # ...normalize both sides before comparison.
+            match_request = match_request.replace(b" ", b"").lower()
+            match_trigger = match_trigger.replace(b" ", b"").lower()
+
+        if match_request != match_trigger:
+            log.info("Ignoring ICMP echo-request from %s without trigger payload." % req_ip.src)
+            return
 
     log.info("ICMP echo-request from %s [id=%d,seq=%d,len=%d]" % (req_ip.src, req_icmp.id, req_icmp.seq, len(req_icmp)))
 
-    if payload_bytes is None:
+    if not payload_bytes:
         payload_bytes = request_load
+
+    # If there are multiple possible response payloads, choose one...
+    if payload_bytes and type(payload_bytes[0]) in (bytes, str):
+        payload_bytes = random.choice(payload_bytes)
+
+        if isinstance(payload_bytes, str):
+            # Strings were included in the check above to avoid confusing errors, nothing more...
+            raise TypeError("response payloads must be byte sequences, not strings")
 
     payload_length = len(payload_bytes)
     max_payload_length = min(len(request_load), MAX_ICMP_PAYLOAD_PADDING)
@@ -174,16 +196,20 @@ def main():
     elif args.filename:
         try:
             with open(args.filename, "rb") as f:
-                payload = f.read(MAX_ICMP_PAYLOAD_SIZE + 1)
+                payload = f.read()
         except OSError as e:
             log.error(str(e))
             sys.exit(1)
     else:
         payload = None  # ...just echo back what the requestor sent.
 
-    if payload and len(payload) > MAX_ICMP_PAYLOAD_SIZE:
-        log.error("Custom ICMP payload must not exceed %d bytes!", MAX_ICMP_PAYLOAD_SIZE)
-        sys.exit(1)
+    if payload:
+        # We don't modify the response payloads, not even to filter out blank/empty lines...
+        payload = payload.replace(b"\r\n", b"\n").split(b"\n") if args.randomize else [payload]
+
+        if any(len(p) > MAX_ICMP_PAYLOAD_SIZE for p in payload):
+            log.error("Custom ICMP payload(s) must not exceed %d bytes!", MAX_ICMP_PAYLOAD_SIZE)
+            sys.exit(1)
 
     # Be quiet and don't use promiscuous mode, ever...
     scapy.config.conf.verb = 0
@@ -195,7 +221,7 @@ def main():
 
     # We need to create the sending socket before dropping root privileges...
     raw_socket = scapy.config.conf.L3socket(iface=scapy.config.conf.iface)
-    capture_cb = lambda packet: send_icmp_echo_reply(raw_socket, packet, payload_bytes=payload, trigger_bytes=trigger)
+    capture_cb = lambda packet: send_icmp_echo_reply(raw_socket, packet, payload, trigger, fuzzy_match=args.fuzzy)
     started_cb = lambda: drop_privileges(args.user, args.group)
 
     log.info("Starting capture on %s...", scapy.config.conf.iface)
