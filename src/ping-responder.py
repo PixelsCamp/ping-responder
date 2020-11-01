@@ -106,7 +106,7 @@ def drop_privileges(user, group):
     os.umask(0o077)
 
 
-def send_icmp_echo_reply(raw_socket, request_packet, payload_bytes=None, trigger_bytes=None, fuzzy_match=False):
+def send_icmp_echo_reply(raw_socket, gw, request_packet, payload_bytes=None, trigger_bytes=None, fuzzy_match=False):
     """
     Send an ICMP echo-reply containing the specified payload back to the sender.
     When a trigger is specified, only requests that include it will be answered.
@@ -159,6 +159,11 @@ def send_icmp_echo_reply(raw_socket, request_packet, payload_bytes=None, trigger
 
     if payload_length < max_payload_length:  # ...add padding.
         payload_bytes += b"\0" * (max_payload_length - payload_length)
+
+    # Replies may be dropped if the destination MAC address cannot be resolved
+    # due to lack of privileges (it will default to the broadcast MAC address).
+    # To work around this, we ensure it's always pre-cached before sending...
+    scapy.config.conf.netcache.arp_cache[gw["ip"]] = gw["mac"]
 
     rep_ip = IP(src=req_ip.dst, dst=req_ip.src, id=random.getrandbits(16))
     rep_icmp = ICMP(type=0, id=req_icmp.id, seq=req_icmp.seq)
@@ -219,9 +224,16 @@ def main():
     if args.iface:  # ...use this network interface instead of the default.
         scapy.config.conf.iface = args.iface
 
+    # Resolving the default route's MAC address after dropping privileges isn't allowed,
+    # preventing ICMP replies from reaching their destination. Of course, obtaining it once
+    # at startup assumes it won't ever change while we're running. We'll be fine, though...
+    gw_ip = scapy.config.conf.route.route("0.0.0.0")[2]
+    gw_mac = scapy.layers.l2.getmacbyip(gw_ip)
+    gw = {"ip": gw_ip, "mac": gw_mac}
+
     # We need to create the sending socket before dropping root privileges...
     raw_socket = scapy.config.conf.L3socket(iface=scapy.config.conf.iface)
-    capture_cb = lambda packet: send_icmp_echo_reply(raw_socket, packet, payload, trigger, fuzzy_match=args.fuzzy)
+    capture_cb = lambda packet: send_icmp_echo_reply(raw_socket, gw, packet, payload, trigger, fuzzy_match=args.fuzzy)
     started_cb = lambda: drop_privileges(args.user, args.group)
 
     log.info("Starting capture on %s...", scapy.config.conf.iface)
