@@ -21,3 +21,7 @@ $ sudo docker run --read-only -d --restart always --net=host \
 ```
 
 Replace `eth0` by the network interface you want to use **on the host** and note that `--net=host` is required otherwise it would only respond to pings sent from within the container network.
+
+## Deployment
+
+On November 1st, 2020, we modified this service for a [small homage](https://twitter.com/pixelscamp/status/1322848356616478721) to [Sean Connery](https://en.wikipedia.org/wiki/Sean_Connery) — who had just died on October 31st — as the challenge mentioned above involved one of his films. This was deployed into a standalone VM using a `Makefile` and tested with an Ubuntu VM bootstrapped with [Vagrant](https://www.vagrantup.com/). You can find both of these things at the root of the repository as a deployment example.
