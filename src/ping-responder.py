@@ -139,7 +139,7 @@ def send_icmp_echo_reply(raw_socket, gw, request_packet, payload_bytes=None, tri
             match_trigger = match_trigger.replace(b" ", b"").lower()
 
         if match_request != match_trigger:
-            log.info("Ignoring ICMP echo-request from %s without trigger payload." % req_ip.src)
+            log.debug("Ignoring ICMP echo-request from %s without trigger payload." % req_ip.src)
             return
 
     log.info("ICMP echo-request from %s [id=%d,seq=%d,len=%d]" % (req_ip.src, req_icmp.id, req_icmp.seq, len(req_icmp)))
