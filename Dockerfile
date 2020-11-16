@@ -30,8 +30,10 @@ RUN apk add --no-cache binutils libpcap-dev tcpdump
 
 COPY --chown=0:0 requirements.txt "${APP_ROOT}"/requirements.txt
 RUN pip install --upgrade -r "${APP_ROOT}/requirements.txt" && rm -f "${APP_ROOT}/requirements.txt"
+RUN mkdir /var/log/ping-responder
 
 COPY --chown=0:0 src/ "${APP_ROOT}"
+COPY --chown=0:0 data/ "${APP_ROOT}/data/"
 
 WORKDIR ${APP_ROOT}
 
