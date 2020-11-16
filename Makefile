@@ -32,7 +32,7 @@ SSH_HOST_CMD := ssh -q -l $(SSH_USER) $(SSH_HOST) -p $(SSH_PORT)
 all: test build  # ...do not deploy, to avoid accidents.
 
 update-images:
-	awk '/^FROM[[:space:]]+/ {print $$2}' Dockerfile.* | xargs -I{} docker pull {}
+	awk '/^FROM[[:space:]]+/ {print $$2}' Dockerfile | xargs -I{} docker pull {}
 
 clean:
 	find . -name '*~' -type f -delete
